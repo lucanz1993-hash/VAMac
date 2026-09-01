@@ -4,3 +4,7 @@ build/
 dist/
 icon.iconset/
 assets/icona.icns
+gestione_squadra.db
+screenshots/
+*.png
+!assets/**/*.png

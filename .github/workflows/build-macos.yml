@@ -68,6 +68,20 @@ jobs:
           name: smoke-log
           path: smoke.log
 
+      - name: Screenshot tour (una schermata per sezione)
+        run: |
+          export QT_QPA_PLATFORM=offscreen
+          export QSG_RHI_BACKEND=software
+          export QT_QUICK_BACKEND=software
+          python tools/screenshot_tour.py screenshots
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: screenshots/
+
       - name: Zip the .app bundle
         run: |
           cd dist
