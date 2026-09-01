@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+build/
+dist/
+icon.iconset/
+assets/icona.icns

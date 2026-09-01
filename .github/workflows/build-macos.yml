@@ -1,0 +1,44 @@
+name: Build macOS app
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Generate .icns from source PNG
+        run: |
+          mkdir icon.iconset
+          for size in 16 32 128 256 512; do
+            sips -z $size $size assets/icona-master.png --out icon.iconset/icon_${size}x${size}.png
+            double=$((size * 2))
+            sips -z $double $double assets/icona-master.png --out icon.iconset/icon_${size}x${size}@2x.png
+          done
+          iconutil -c icns icon.iconset -o assets/icona.icns
+
+      - name: Build with PyInstaller
+        run: pyinstaller FC_Manager_mac.spec
+
+      - name: Zip the .app bundle
+        run: |
+          cd dist
+          ditto -c -k --sequesterRsrc --keepParent "FC Manager.app" "FC-Manager-macOS.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FC-Manager-macOS
+          path: dist/FC-Manager-macOS.zip
