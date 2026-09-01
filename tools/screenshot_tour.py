@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PyQt6.QtCore import QTimer, QUrl
 from PyQt6.QtGui import QGuiApplication
+from PyQt6.QtQuick import QQuickWindow  # noqa: F401 - senza questo import SIP wrappa le finestre QML come QWindow base, senza grabWindow()
 
 import crea_db
 from qml_bridge import crea_motore_qml, get_resource_path
