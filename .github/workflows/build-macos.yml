@@ -33,6 +33,41 @@ jobs:
       - name: Build with PyInstaller
         run: pyinstaller FC_Manager_mac.spec
 
+      - name: Smoke test (headless launch)
+        run: |
+          export QT_QPA_PLATFORM=offscreen
+          APP="dist/FC Manager.app/Contents/MacOS/FC Manager"
+          chmod +x "$APP"
+          "$APP" > smoke.log 2>&1 &
+          PID=$!
+          sleep 8
+          if kill -0 $PID 2>/dev/null; then
+            echo "App still running after 8s, no immediate crash: OK"
+            kill $PID
+            wait $PID 2>/dev/null || true
+          else
+            wait $PID
+            EXIT=$?
+            echo "App exited early with code $EXIT"
+            cat smoke.log
+            if [ $EXIT -ne 0 ]; then
+              echo "::error::App crashed on launch, see smoke.log"
+              exit 1
+            fi
+          fi
+          if grep -qi "Traceback (most recent call last)" smoke.log; then
+            echo "::error::Python traceback found in smoke.log"
+            cat smoke.log
+            exit 1
+          fi
+
+      - name: Upload smoke log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-log
+          path: smoke.log
+
       - name: Zip the .app bundle
         run: |
           cd dist
