@@ -103,7 +103,10 @@ def main():
             print("[screenshot_tour] ERRORE: App.qml non caricato")
             app.exit(1)
             return
-        _finestra_corrente["win"] = engine.rootObjects()[0]
+        # rootObjects() accumula: contiene ancora la finestra di Login appena
+        # chiusa (deleteLater() e' solo schedulato) oltre alla nuova finestra
+        # App - quella nuova e' sempre l'ultima aggiunta, mai la prima.
+        _finestra_corrente["win"] = engine.rootObjects()[-1]
 
         def avanza(indice_tappa):
             if indice_tappa >= len(TAPPE):
