@@ -18,7 +18,20 @@ Flickable {
     // senza deselezionarla lato VM, cosi' "← Torna alle sedute" non perde i
     // dati gia' caricati. E' uno stato solo-QML perche' la schermata viene
     // comunque ricreata da zero a ogni navigazione (vedi sotto).
-    property bool vistaElenco: true
+    // FIX (stesso bug segnalato da Luca per Macrociclo, identico qui): era
+    // "property bool vistaElenco: true" fisso - tornare qui con "indietro"
+    // da un'altra sezione dopo aver gia' aperto una seduta specifica la
+    // trovava sempre sull'elenco, perdendo il dettaglio su cui si stava
+    // lavorando. seduteVM.sedutaCaricata resta vera sull'oggetto Python
+    // (mai azzerata dalla sola navigazione) finche' non si elimina/chiude
+    // davvero la seduta: il binding entra quindi subito nel dettaglio
+    // quando ce n'e' uno gia' aperto in questa sessione.
+    property bool vistaElenco: !seduteVM.sedutaCaricata
+    // Stesso meccanismo di Macrociclo.qml: il tasto "‹" globale in App.qml
+    // legge queste due proprieta' per far tornare "indietro" prima
+    // all'elenco sedute, poi (un secondo clic) alla sezione precedente.
+    readonly property bool puoIndietroLocale: !vistaElenco
+    function indietroLocale() { vistaElenco = true }
 
     // La schermata viene ricreata da zero (stack.replace) ogni volta che la
     // si riapre, ma seduteVM e' lo stesso oggetto Python per tutta la
@@ -517,14 +530,24 @@ Flickable {
                                             spacing: 2
                                             Text { text: "Minuti"; color: Theme.colors.textSecondary; font.family: Theme.typography.family; font.pixelSize: Theme.typography.caption; font.bold: true }
                                             TextField {
+                                                objectName: "campoMinutiBlocco"
                                                 width: parent.width
                                                 placeholderText: "Minuti"
                                                 placeholderTextColor: Theme.colors.textSecondary
-                                                text: String(blocco.faseDati.durata_minuti)
                                                 color: Theme.colors.textPrimary
                                                 font.family: Theme.typography.family
                                                 background: Rectangle { color: Theme.colors.bgSurface3; radius: Theme.radius.sm; border.width: 1; border.color: Theme.colors.border }
                                                 onEditingFinished: seduteVM.impostaCampoBlocco(blocco.indiceBlocco, "durata_minuti", text)
+                                                // FIX: stesso motivo di descrizione/obiettivi/mezzo sopra
+                                                // ("text" era un binding LIVE a blocco.faseDati.durata_minuti).
+                                                // Modificare un qualunque altro campo dello stesso blocco fa
+                                                // ricreare tutti i delegate di questo Repeater (model: seduteVM.fasi,
+                                                // QVariantList rimpiazzata per intero ad ogni dettaglioCambiato):
+                                                // un binding live rilegge il vecchio valore (es. 10 di default)
+                                                // se il rebuild arriva prima che l'utente abbia tolto il focus da
+                                                // qui. Component.onCompleted imposta il valore una sola volta,
+                                                // rendendo questo campo immune ai rebuild innescati da altri campi.
+                                                Component.onCompleted: text = String(blocco.faseDati.durata_minuti)
                                             }
                                         }
                                         FMButton {
@@ -647,37 +670,49 @@ Flickable {
                                         width: parent.width
                                         spacing: 2
                                         Text { text: "Descrizione / focus esercizio"; color: Theme.colors.textSecondary; font.family: Theme.typography.family; font.pixelSize: Theme.typography.caption; font.bold: true }
-                                        TextArea {
+                                        // FIX (segnalato da Luca: scrivendo oltre la quarta riga non
+                                        // si legge piu' cosa si sta scrivendo): l'altezza fissa (76)
+                                        // era sul TextArea stesso, che senza scroll proprio si limita
+                                        // a tagliare il testo oltre quella altezza - il cursore finiva
+                                        // fuori dall'area visibile. ScrollView tiene fissa l'altezza
+                                        // del riquadro ma lascia il TextArea crescere con il contenuto
+                                        // (contentHeight), scorrendolo invece di tagliarlo.
+                                        ScrollView {
                                             width: parent.width
                                             height: 76
-                                            wrapMode: TextEdit.WordWrap
-                                            placeholderText: "Descrivi l'esercizio…"
-                                            placeholderTextColor: Theme.colors.textSecondary
-                                            color: Theme.colors.textPrimary
-                                            font.family: Theme.typography.family
-                                            background: Rectangle { color: Theme.colors.bgSurface3; radius: Theme.radius.sm; border.width: 1; border.color: Theme.colors.border }
-                                            // FIX (segnalato da un collega di Luca: "se metto la
-                                            // descrizione e poi metto l'obiettivo, mi cancella la
-                                            // descrizione"): "text" era un binding LIVE a
-                                            // blocco.faseDati.esercitazione.descrizione. Impostare un
-                                            // qualunque altro campo dello stesso blocco (es. Obiettivo
-                                            // Tecnico) fa ricreare TUTTI i delegate di questo Repeater
-                                            // (stesso motivo gia' spiegato sopra per i ComboBox - il
-                                            // modello e' un array intero, non incrementale): se il testo
-                                            // appena digitato qui non era ancora stato commesso al VM
-                                            // (accade solo alla perdita del focus, vedi sotto), il nuovo
-                                            // TextArea appena ricreato si ri-legava al valore VECCHIO,
-                                            // cancellando visivamente quanto scritto. Stessa correzione
-                                            // gia' applicata ai ComboBox: inizializzare "text" una sola
-                                            // volta a Component.onCompleted invece di un binding live
-                                            // rende questo campo immune ai rebuild innescati da altri
-                                            // campi del blocco.
-                                            Component.onCompleted: text = blocco.faseDati.esercitazione.descrizione
-                                            // TextArea non ha "editingFinished" (a differenza di
-                                            // TextField): serve per il testo multi-riga, dove Invio
-                                            // deve andare a capo, non confermare - si salva quindi alla
-                                            // perdita del focus.
-                                            onActiveFocusChanged: if (!activeFocus) seduteVM.impostaCampoEsercitazione(blocco.indiceBlocco, "descrizione", text)
+                                            clip: true
+                                            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                                            TextArea {
+                                                width: parent.width
+                                                wrapMode: TextEdit.WordWrap
+                                                placeholderText: "Descrivi l'esercizio…"
+                                                placeholderTextColor: Theme.colors.textSecondary
+                                                color: Theme.colors.textPrimary
+                                                font.family: Theme.typography.family
+                                                background: Rectangle { color: Theme.colors.bgSurface3; radius: Theme.radius.sm; border.width: 1; border.color: Theme.colors.border }
+                                                // FIX (segnalato da un collega di Luca: "se metto la
+                                                // descrizione e poi metto l'obiettivo, mi cancella la
+                                                // descrizione"): "text" era un binding LIVE a
+                                                // blocco.faseDati.esercitazione.descrizione. Impostare un
+                                                // qualunque altro campo dello stesso blocco (es. Obiettivo
+                                                // Tecnico) fa ricreare TUTTI i delegate di questo Repeater
+                                                // (stesso motivo gia' spiegato sopra per i ComboBox - il
+                                                // modello e' un array intero, non incrementale): se il testo
+                                                // appena digitato qui non era ancora stato commesso al VM
+                                                // (accade solo alla perdita del focus, vedi sotto), il nuovo
+                                                // TextArea appena ricreato si ri-legava al valore VECCHIO,
+                                                // cancellando visivamente quanto scritto. Stessa correzione
+                                                // gia' applicata ai ComboBox: inizializzare "text" una sola
+                                                // volta a Component.onCompleted invece di un binding live
+                                                // rende questo campo immune ai rebuild innescati da altri
+                                                // campi del blocco.
+                                                Component.onCompleted: text = blocco.faseDati.esercitazione.descrizione
+                                                // TextArea non ha "editingFinished" (a differenza di
+                                                // TextField): serve per il testo multi-riga, dove Invio
+                                                // deve andare a capo, non confermare - si salva quindi alla
+                                                // perdita del focus.
+                                                onActiveFocusChanged: if (!activeFocus) seduteVM.impostaCampoEsercitazione(blocco.indiceBlocco, "descrizione", text)
+                                            }
                                         }
                                     }
                                 }

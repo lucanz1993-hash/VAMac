@@ -111,12 +111,26 @@ Flickable {
                         font.bold: true
                     }
                     Text {
-                        text: "sedute delle ultime due settimane senza presenze registrate."
+                        text: "sedute delle ultime due settimane senza presenze registrate:"
                         color: Theme.colors.textSecondary
                         font.family: Theme.typography.family
                         font.pixelSize: Theme.typography.small
                         wrapMode: Text.WordWrap
                         width: parent.width
+                    }
+                    Repeater {
+                        // Quali, non solo quante (segnalato da Luca): un'etichetta
+                        // gia' pronta per riga, costruita lato VM (stesso principio
+                        // di prossimaSedutaEtichetta sopra).
+                        model: dashboardVM.sedutePresenzeMancantiElenco
+                        delegate: Text {
+                            width: parent.width
+                            text: "• " + modelData.etichetta
+                            color: Theme.colors.textPrimary
+                            font.family: Theme.typography.family
+                            font.pixelSize: Theme.typography.small
+                            wrapMode: Text.WordWrap
+                        }
                     }
                 }
             }

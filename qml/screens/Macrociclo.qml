@@ -51,7 +51,22 @@ Flickable {
     // deselezionarlo lato VM, cosi' "← Torna ai gruppi" non perde i dati gia'
     // caricati. E' uno stato solo-QML (non persistito nel VM) perche' la
     // schermata viene comunque ricreata da zero a ogni navigazione.
-    property bool vistaGruppi: true
+    // FIX (segnalato da Luca): era "property bool vistaGruppi: true" fisso -
+    // la schermata viene ricreata da zero ad ogni navigazione (vedi sopra),
+    // quindi tornare qui con "indietro" da un'ALTRA sezione (es. da Presenze
+    // dopo essere entrati in un gruppo) la trovava sempre vuota/azzerata
+    // sulla lista gruppi, anche se un gruppo era gia' selezionato. Il
+    // binding con macrocicloVM.indiceGruppo (che e' sullo stesso oggetto
+    // Python per tutta la sessione, non si azzera mai da solo) fa entrare
+    // subito nel gruppo gia' selezionato quando ce n'e' uno; resta sulla
+    // lista solo quando non e' mai stato scelto nulla in questa sessione.
+    property bool vistaGruppi: macrocicloVM.indiceGruppo === -1
+    // Letti dal tasto "‹" globale in App.qml: il primo "indietro" mentre si
+    // e' dentro un gruppo torna qui alla lista gruppi (stesso identico
+    // effetto di "← Torna ai gruppi" sotto), prima di consumare un passo
+    // della storico di navigazioneVM.
+    readonly property bool puoIndietroLocale: !vistaGruppi
+    function indietroLocale() { vistaGruppi = true }
 
     readonly property string voceNuovaCategoria: "+ Nuova categoria…"
     // Base standard settore giovanile italiano, sempre in tendina anche a DB

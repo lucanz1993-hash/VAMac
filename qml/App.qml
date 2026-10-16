@@ -113,7 +113,19 @@ ApplicationWindow {
                             anchors.margins: -6
                             enabled: navigazioneVM.puoIndietro
                             cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                            onClicked: navigazioneVM.indietro()
+                            // Alcune schermate (Macrociclo, Sedute) hanno un "drill" interno
+                            // (lista gruppi/sedute -> dettaglio) che e' stato solo-QML, mai
+                            // registrato nella storico di navigazioneVM: senza questo controllo,
+                            // il tasto "indietro" saltava quello stato intermedio e andava
+                            // sempre direttamente alla sezione precedente (es. Dashboard),
+                            // ignorando che l'utente era "entrato in un gruppo" (segnalato da
+                            // Luca). Se la schermata corrente espone puoIndietroLocale/
+                            // indietroLocale() lo usiamo per il primo passo indietro; altrimenti
+                            // (ogni altra schermata) si comporta come prima.
+                            onClicked: {
+                                if (stack.currentItem && stack.currentItem.puoIndietroLocale) stack.currentItem.indietroLocale()
+                                else navigazioneVM.indietro()
+                            }
                         }
                     }
                     Text {

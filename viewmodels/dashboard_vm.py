@@ -23,6 +23,7 @@ class DashboardVM(QObject):
         self._dati_utente = dati_utente
         self._prossima_seduta = None
         self._sedute_da_registrare = 0
+        self._sedute_mancanti = []
         self._errore = ""
         self.ricarica()
 
@@ -75,6 +76,23 @@ class DashboardVM(QObject):
     def sedutePresenzeMancanti(self):
         return self._sedute_da_registrare
 
+    @pyqtProperty("QVariantList", notify=riepilogoCambiato)
+    def sedutePresenzeMancantiElenco(self):
+        # Stesso stile di prossimaSedutaData/prossimaSedutaEtichetta sopra:
+        # i dati grezzi (data ISO, cat/stag/soc) restano in data_manager,
+        # l'etichetta pronta per la UI si costruisce qui.
+        elenco = []
+        for s in self._sedute_mancanti:
+            try:
+                anno, mese, giorno = s["data"].split("-")
+                data_it = f"{giorno}-{mese}-{anno}"
+            except Exception:
+                data_it = s["data"]
+            base = f"{s['cat']} — {s['stag']}"
+            gruppo = f"{s['soc']} · {base}" if s.get("soc") else base
+            elenco.append({"idSeduta": s["idSeduta"], "etichetta": f"{data_it} — {gruppo}"})
+        return elenco
+
     @pyqtProperty(str, notify=riepilogoCambiato)
     def errore(self):
         return self._errore
@@ -84,5 +102,6 @@ class DashboardVM(QObject):
         riepilogo = DataManager.get_riepilogo_dashboard(self._dati_utente)
         self._prossima_seduta = riepilogo.get("prossima_seduta")
         self._sedute_da_registrare = riepilogo.get("sedute_da_registrare", 0)
+        self._sedute_mancanti = riepilogo.get("sedute_mancanti", [])
         self._errore = riepilogo.get("errore") or ""
         self.riepilogoCambiato.emit()

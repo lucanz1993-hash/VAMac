@@ -26,7 +26,7 @@ import os
 
 from PyQt6.QtCore import QObject, QSettings, pyqtProperty, pyqtSignal, pyqtSlot
 
-from data_manager import DataManager, _id_settimana_giorno_da_data
+from data_manager import GIORNI, DataManager, _id_settimana_giorno_da_data
 from esporta_pdf import esporta_seduta_in_pdf
 
 ORGANIZZAZIONE = "LB Coaching"
@@ -461,6 +461,32 @@ class SeduteVM(QObject):
         except Exception:
             pass
 
+    def _riallinea_collegamento_macrociclo(self, gruppo, nuova_data_iso):
+        # Usato da spostaSedutaCorrente: se la seduta e' collegata a una
+        # cella (qualunque giorno), la si scollega prima di ritentare
+        # l'aggancio sulla cella giusta per la nuova data - altrimenti
+        # resterebbe agganciata al vecchio giorno anche dopo lo spostamento
+        # (vedi FIX nel commento di spostaSedutaCorrente). Un fallimento in
+        # una qualunque delle due meta' (nessuna cella trovata da scollegare,
+        # aggancio nuovo non possibile) e' catturato e ignorato: la seduta
+        # resta comunque spostata, al peggio senza alcun collegamento -
+        # esattamente come una seduta creata "libera".
+        try:
+            righe = DataManager.get_macrociclo(self._dati_utente, gruppo["cat"], gruppo["stag"], gruppo["soc"])
+            for r in righe:
+                for gg in GIORNI:
+                    if r.get(f"id_seduta_{gg}") == self._id_seduta_corrente:
+                        DataManager.scollega_seduta_da_macrociclo(
+                            self._dati_utente, gruppo["cat"], gruppo["stag"], gruppo["soc"], r["id_settimana"], gg,
+                        )
+                        break
+                else:
+                    continue
+                break
+        except Exception:
+            pass
+        self._collega_a_macrociclo_se_possibile(gruppo, nuova_data_iso, self._id_seduta_corrente)
+
     @pyqtSlot()
     def eliminaSedutaCorrente(self):
         if self._id_seduta_corrente is None:
@@ -539,6 +565,20 @@ class SeduteVM(QObject):
                 self._dati_utente, self._id_seduta_corrente, data_iso, self._numero_seduta,
                 gruppo["cat"], gruppo["stag"], self._giocatori, gruppo["soc"], self._societa_stampa, self._fasi, self._obiettivo_principale,
             )
+            # FIX (segnalato da Luca): spostare la data qui non toccava il
+            # collegamento macrociclo - la cella restava agganciata al
+            # VECCHIO giorno della settimana, mentre la Griglia Mensile di
+            # Presenze colonna sul NUMERO del giorno letto dalla data della
+            # seduta (non dal giorno della cella collegata, vedi
+            # calcolaGrigliaMensile in presenze_vm.py): il risultato era una
+            # seduta che compariva sotto la data nuova nella griglia ma
+            # restava ancorata, per Macrociclo/Presenze-calendario, al
+            # vecchio giorno - due viste in contraddizione sulla stessa
+            # seduta, con la colonna del giorno "vero" vuota. Ci si scollega
+            # dalla cella vecchia (se c'era) e si ritenta l'aggancio
+            # automatico sulla cella giusta per la nuova data, stessa logica
+            # best-effort gia' usata da nuovaSeduta.
+            self._riallinea_collegamento_macrociclo(gruppo, data_iso)
             # Aggiornato qui in memoria (non tramite il reload sotto, che ora
             # non ricarica piu' da DB una seduta gia' aperta - vedi
             # _ricarica_sedute): altrimenti la data mostrata restava quella

@@ -2222,7 +2222,7 @@ class DataManager:
         l'intera schermata: l'utente vede un avviso chiaro invece di una
         dashboard che si blocca o mostra dati a metà.
         """
-        risultato = {"prossima_seduta": None, "sedute_da_registrare": 0, "errore": None}
+        risultato = {"prossima_seduta": None, "sedute_da_registrare": 0, "sedute_mancanti": [], "errore": None}
         try:
             # La Dashboard è la prima schermata mostrata dopo il login: se
             # l'utente non passa mai da Macrociclo/Sedute (uniche schermate
@@ -2246,6 +2246,10 @@ class DataManager:
 
             prossima = None
             da_registrare = 0
+            # Elenco delle sedute stesse (non solo il conteggio): la Dashboard
+            # mostrava solo "N sedute senza presenze registrate" senza dire
+            # quali - l'utente doveva andare a cercarle a mano (segnalato).
+            sedute_mancanti = []
 
             for g in gruppi:
                 cat, stag, soc = g.get("cat"), g.get("stag"), g.get("soc", "")
@@ -2263,6 +2267,10 @@ class DataManager:
                         presenze = DataManager.get_presenze_seduta(dati_utente, s["id_seduta"])
                         if not presenze:
                             da_registrare += 1
+                            sedute_mancanti.append({
+                                "idSeduta": s["id_seduta"], "data": d, "numero": s.get("numero_seduta", ""),
+                                "cat": cat, "stag": stag, "soc": soc,
+                            })
 
                 # FIX: fino ad ora la "prossima" veniva individuata SOLO
                 # scansionando la tabella "sedute", cioè solo se alla cella
@@ -2294,8 +2302,10 @@ class DataManager:
                             numero = "Partita" if tipo in ("TM", "TA", "C") else "Allenamento"
                             prossima = {"data": d, "numero": numero, "cat": cat, "stag": stag, "soc": soc}
 
+            sedute_mancanti.sort(key=lambda s: s["data"])
             risultato["prossima_seduta"] = prossima
             risultato["sedute_da_registrare"] = da_registrare
+            risultato["sedute_mancanti"] = sedute_mancanti
         except Exception as e:
             risultato["errore"] = str(e)
         return risultato
